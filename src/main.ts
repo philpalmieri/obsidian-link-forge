@@ -11,7 +11,7 @@ interface ProcessingContext {
 }
 
 export default class LinkForgePlugin extends Plugin {
-	settings: LinkForgeSettings;
+	settings!: LinkForgeSettings;
 	private pendingWork: ProcessingContext | null = null;
 	private processing = false;
 
