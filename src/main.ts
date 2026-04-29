@@ -1,4 +1,4 @@
-import { Plugin, TFile, TAbstractFile, MarkdownView, Editor } from 'obsidian';
+import { Plugin, TFile, TAbstractFile, MarkdownView, Editor, normalizePath } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { DEFAULT_SETTINGS, LinkForgeSettings, LinkForgeSettingTab } from './settings';
 import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings, ParsedWikilink } from './utils';
@@ -128,7 +128,7 @@ export default class LinkForgePlugin extends Plugin {
 	 * Returns true if the file now exists, false on failure.
 	 */
 	private async createFileFromLink(linkPath: string): Promise<boolean> {
-		const filePath = linkPath.endsWith('.md') ? linkPath : linkPath + '.md';
+		const filePath = normalizePath(linkPath.endsWith('.md') ? linkPath : linkPath + '.md');
 
 		// Validate: must have a non-empty basename
 		const basename = filePath.substring(filePath.lastIndexOf('/') + 1);
