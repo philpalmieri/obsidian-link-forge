@@ -89,3 +89,17 @@ export function applyLinkShortenings(
 	}
 	return result;
 }
+
+/**
+ * Check if a link path has a non-markdown file extension.
+ * Returns true if the path ends with an extension that is NOT .md,
+ * indicating it targets a non-markdown file (e.g., .pdf, .png).
+ * Uses a max extension length of 5 to avoid false positives from
+ * dots in filenames (e.g., "Dr. Smith").
+ */
+export function hasNonMarkdownExtension(linkPath: string): boolean {
+	const lastDot = linkPath.lastIndexOf('.');
+	if (lastDot === -1) return false;
+	const ext = linkPath.substring(lastDot + 1).toLowerCase();
+	return ext !== 'md' && ext.length > 0 && ext.length <= 5;
+}
