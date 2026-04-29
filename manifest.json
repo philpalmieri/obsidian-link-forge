@@ -2,7 +2,7 @@
 	"id": "link-forge",
 	"name": "Link Forge",
 	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
+	"minAppVersion": "1.0.0",
 	"description": "Auto create linked files if they don't exist in real-time",
 	"author": "Phil Palmieri",
 	"authorUrl": "https://github.com/philpalmieri",
