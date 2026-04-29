@@ -8,17 +8,16 @@ You type `[[People/Johnny Appleseed]]` in a note. You press Enter. Link Forge:
 
 1. Detects the unresolved wikilink on the line you just left
 2. Creates `People/Johnny Appleseed.md` (and any missing parent folders)
-3. Applies your Templater folder template (if configured)
-4. Shortens the link to `[[Johnny Appleseed]]` (if it resolves uniquely)
+3. Shortens the link to `[[Johnny Appleseed]]` (if it resolves uniquely)
 
 All silently, in the background, while you keep writing.
 
 ## Features
 
 - **Line-change detection** — uses CodeMirror 6 `EditorView.updateListener` to process links only when you leave a line (not on every keystroke)
-- **Watched folders** — only auto-creates for links targeting configured folders (default: `People/`, `Projects/`)
+- **Watched folders** — only auto-creates for links targeting configured folders (empty by default = all folders)
 - **Folder creation** — automatically creates missing parent directories
-- **Templater integration** — triggers Templater folder templates on newly created files
+- **Templater compatible** — works with Templater's built-in "Trigger on file creation" for automatic folder templates
 - **Link shortening** — rewrites `[[Folder/Name]]` to `[[Name]]` when the basename resolves uniquely
 - **Heading + alias preservation** — `[[People/Name#Bio|Their Bio]]` shortens to `[[Name#Bio|Their Bio]]`
 
@@ -54,9 +53,12 @@ Open Settings → Link Forge:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Enabled | `true` | Global toggle |
-| Watched folders | `People/, Projects/` | Only auto-create for links targeting these folders (comma-separated) |
-| Apply Templater templates | `true` | Trigger Templater folder templates on creation |
+| Watched folders | *(empty)* | Only auto-create for links targeting these folders (comma-separated). Empty = all folders. |
 | Shorten links after creation | `true` | Rewrite to shortest unique path after file exists |
+
+### Templater compatibility
+
+Link Forge works seamlessly with [Templater](https://github.com/SilentVoid13/Templater). When Link Forge creates a new file, Templater's built-in "Trigger on file creation" feature automatically applies your configured folder templates. No additional configuration needed in Link Forge; just set up your folder templates in Templater's settings as usual.
 
 ## How it works
 

@@ -71,7 +71,8 @@ export default class LinkForgePlugin extends Plugin {
 
 	/**
 	 * Create a file (and parent folders) for an unresolved link path.
-	 * Optionally triggers Templater folder templates.
+	 * Templater will automatically apply folder templates via its own
+	 * vault "create" event listener if configured.
 	 */
 	private async createFileFromLink(linkPath: string): Promise<void> {
 		const filePath = linkPath.endsWith('.md') ? linkPath : linkPath + '.md';
@@ -83,12 +84,8 @@ export default class LinkForgePlugin extends Plugin {
 		}
 
 		try {
-			const newFile = await this.app.vault.create(filePath, '');
+			await this.app.vault.create(filePath, '');
 			console.debug(`[Link Forge] Created: ${filePath}`);
-
-			if (this.settings.applyTemplaterTemplates) {
-				await this.triggerTemplater(newFile);
-			}
 		} catch {
 			// File may already exist (race condition or concurrent creation)
 		}
@@ -101,7 +98,6 @@ export default class LinkForgePlugin extends Plugin {
 		const existing: TAbstractFile | null = this.app.vault.getAbstractFileByPath(folderPath);
 		if (existing) return;
 
-		// Ensure parent exists first
 		const parent = folderPath.substring(0, folderPath.lastIndexOf('/'));
 		if (parent) {
 			await this.ensureFolderExists(parent);
@@ -131,7 +127,7 @@ export default class LinkForgePlugin extends Plugin {
 
 		const lineIndex = lineNumber - 1;
 		if (lineIndex < 0 || lineIndex >= editor.lineCount()) return;
-		let currentLineText = editor.getLine(lineIndex);
+		const currentLineText = editor.getLine(lineIndex);
 
 		const replacements: { original: string; shortened: string }[] = [];
 
@@ -158,31 +154,6 @@ export default class LinkForgePlugin extends Plugin {
 			if (newLineText !== currentLineText) {
 				editor.setLine(lineIndex, newLineText);
 			}
-		}
-	}
-
-	/**
-	 * Trigger Templater to apply its folder template to a newly created file.
-	 */
-	private async triggerTemplater(file: TFile): Promise<void> {
-		try {
-			/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const templater = (this.app as any).plugins?.plugins?.['templater-obsidian'];
-			if (!templater?.templater) return;
-
-			const runningConfig = templater.templater.create_running_config(
-				undefined, // template file (undefined = use folder template)
-				file,
-				0 // run mode: 0 = create new from template
-			);
-
-			if (runningConfig) {
-				await templater.templater.read_and_parse_template(runningConfig);
-			}
-			/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-		} catch (e) {
-			console.debug('[Link Forge] Templater integration skipped:', e);
 		}
 	}
 
