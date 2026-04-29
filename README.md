@@ -23,7 +23,7 @@ All silently, in the background, while you keep writing.
 
 ## Installation
 
-### From Community Plugins (coming soon)
+### From Community Plugins
 
 1. Open Obsidian Settings → Community Plugins
 2. Search for "Link Forge"
@@ -68,7 +68,7 @@ Link Forge registers a [CodeMirror 6 editor extension](https://codemirror.net/do
 2. Filters to links targeting watched folders
 3. Checks each against `metadataCache.getFirstLinkpathDest()` to see if the file exists
 4. Creates missing files (with parent folders) via `vault.create()`
-5. Optionally triggers Templater and shortens the link text
+5. Optionally shortens the link text
 
 This means it only activates on line changes (Enter, arrow keys, mouse click to another line), not on every keystroke.
 

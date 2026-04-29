@@ -1,17 +1,24 @@
-import { Plugin, TFile, TAbstractFile, MarkdownView } from 'obsidian';
+import { Plugin, TFile, TAbstractFile, MarkdownView, Editor } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { DEFAULT_SETTINGS, LinkForgeSettings, LinkForgeSettingTab } from './settings';
-import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings } from './utils';
+import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings, ParsedWikilink } from './utils';
+
+interface ProcessingContext {
+	lineText: string;
+	lineNumber: number;
+	sourceFilePath: string;
+	editor: Editor;
+}
 
 export default class LinkForgePlugin extends Plugin {
 	settings: LinkForgeSettings;
+	private pendingWork: ProcessingContext | null = null;
 	private processing = false;
 
 	async onload() {
 		await this.loadSettings();
 		this.addSettingTab(new LinkForgeSettingTab(this.app, this));
 
-		// CM6 extension: detect when cursor moves to a new line
 		const lineChangeExtension = EditorView.updateListener.of((update: ViewUpdate) => {
 			if (!this.settings.enabled) return;
 			if (!update.docChanged && !update.selectionSet) return;
@@ -24,8 +31,21 @@ export default class LinkForgePlugin extends Plugin {
 			).number;
 
 			if (oldLine !== newLine) {
-				const previousLineText = update.state.doc.line(oldLine).text;
-				void this.processLineForUnresolvedLinks(previousLineText, oldLine);
+				// Read the previous line from the OLD document state
+				const previousLineText = update.startState.doc.line(oldLine).text;
+
+				// Capture editor context now while it's guaranteed stable
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view?.file) return;
+
+				const context: ProcessingContext = {
+					lineText: previousLineText,
+					lineNumber: oldLine,
+					sourceFilePath: view.file.path,
+					editor: view.editor,
+				};
+
+				void this.enqueueProcessing(context);
 			}
 		});
 
@@ -35,49 +55,85 @@ export default class LinkForgePlugin extends Plugin {
 	onunload() {}
 
 	/**
-	 * Extract wikilinks from a line and create files for unresolved ones
-	 * that target watched folders. After creation, shorten links if possible.
+	 * Enqueue line processing. If already processing, stores the latest
+	 * pending context (coalesces rapid changes). After current work finishes,
+	 * drains the pending item.
 	 */
-	async processLineForUnresolvedLinks(lineText: string, lineNumber: number) {
-		if (this.processing) return;
+	private async enqueueProcessing(context: ProcessingContext): Promise<void> {
+		if (this.processing) {
+			this.pendingWork = context;
+			return;
+		}
+
 		this.processing = true;
-
 		try {
-			const links = extractWikilinks(lineText);
-			const createdLinks: { original: string; linkPath: string; heading: string | undefined; alias: string | undefined }[] = [];
-
-			for (const link of links) {
-				if (!isInWatchedFolder(link.linkPath, this.settings.watchedFolders)) continue;
-
-				const activeFile = this.app.workspace.getActiveFile();
-				const resolvedFile = this.app.metadataCache.getFirstLinkpathDest(
-					link.linkPath,
-					activeFile?.path ?? ''
-				);
-
-				if (!resolvedFile) {
-					await this.createFileFromLink(link.linkPath);
-					createdLinks.push(link);
-				}
-			}
-
-			if (this.settings.shortenLinksAfterCreation && createdLinks.length > 0) {
-				await this.shortenLinks(createdLinks, lineNumber);
-			}
+			await this.processLineForUnresolvedLinks(context);
 		} finally {
 			this.processing = false;
+		}
+
+		// Drain any pending work that arrived during processing
+		if (this.pendingWork) {
+			const next = this.pendingWork;
+			this.pendingWork = null;
+			void this.enqueueProcessing(next);
 		}
 	}
 
 	/**
-	 * Create a file (and parent folders) for an unresolved link path.
-	 * Templater will automatically apply folder templates via its own
-	 * vault "create" event listener if configured.
+	 * Extract wikilinks from a line and create files for unresolved ones
+	 * that target watched folders. After creation, shorten links if possible.
 	 */
-	private async createFileFromLink(linkPath: string): Promise<void> {
+	private async processLineForUnresolvedLinks(context: ProcessingContext): Promise<void> {
+		const { lineText, lineNumber, sourceFilePath, editor } = context;
+		const links = extractWikilinks(lineText);
+		const createdLinks: ParsedWikilink[] = [];
+
+		for (const link of links) {
+			if (!isInWatchedFolder(link.linkPath, this.settings.watchedFolders)) continue;
+
+			// Skip links that target non-markdown extensions
+			if (this.hasNonMarkdownExtension(link.linkPath)) continue;
+
+			const resolvedFile = this.app.metadataCache.getFirstLinkpathDest(
+				link.linkPath,
+				sourceFilePath
+			);
+
+			if (!resolvedFile) {
+				const created = await this.createFileFromLink(link.linkPath);
+				if (created) {
+					createdLinks.push(link);
+				}
+			}
+		}
+
+		if (this.settings.shortenLinksAfterCreation && createdLinks.length > 0) {
+			this.shortenLinks(createdLinks, lineNumber, sourceFilePath, editor);
+		}
+	}
+
+	/**
+	 * Check if a link path has a non-markdown file extension.
+	 */
+	private hasNonMarkdownExtension(linkPath: string): boolean {
+		const lastDot = linkPath.lastIndexOf('.');
+		if (lastDot === -1) return false;
+		const ext = linkPath.substring(lastDot + 1).toLowerCase();
+		return ext !== 'md' && ext.length > 0 && ext.length <= 5;
+	}
+
+	/**
+	 * Create a file (and parent folders) for an unresolved link path.
+	 * Returns true if the file now exists, false on failure.
+	 */
+	private async createFileFromLink(linkPath: string): Promise<boolean> {
 		const filePath = linkPath.endsWith('.md') ? linkPath : linkPath + '.md';
 
-		// Ensure parent directories exist
+		// Validate: must have a non-empty basename
+		const basename = filePath.substring(filePath.lastIndexOf('/') + 1);
+		if (!basename || basename === '.md') return false;
+
 		const dir = filePath.substring(0, filePath.lastIndexOf('/'));
 		if (dir) {
 			await this.ensureFolderExists(dir);
@@ -86,8 +142,11 @@ export default class LinkForgePlugin extends Plugin {
 		try {
 			await this.app.vault.create(filePath, '');
 			console.debug(`[Link Forge] Created: ${filePath}`);
+			return true;
 		} catch {
-			// File may already exist (race condition or concurrent creation)
+			// Check if file exists now (race condition with concurrent creation)
+			const existing = this.app.vault.getAbstractFileByPath(filePath);
+			return existing instanceof TFile;
 		}
 	}
 
@@ -112,18 +171,18 @@ export default class LinkForgePlugin extends Plugin {
 
 	/**
 	 * Shorten wikilinks in the editor after file creation.
-	 * Rewrites [[People/Johnny Appleseed]] to [[Johnny Appleseed]] if the
-	 * basename resolves uniquely to the created file.
+	 * Uses the captured editor reference to avoid acting on a different note.
 	 */
-	private async shortenLinks(
-		createdLinks: { original: string; linkPath: string; heading: string | undefined; alias: string | undefined }[],
-		lineNumber: number
-	): Promise<void> {
-		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!view) return;
-
-		const editor = view.editor;
-		const activeFilePath = view.file?.path ?? '';
+	private shortenLinks(
+		createdLinks: ParsedWikilink[],
+		lineNumber: number,
+		sourceFilePath: string,
+		editor: Editor
+	): void {
+		// Verify the editor still corresponds to the same file
+		const currentView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!currentView?.file || currentView.file.path !== sourceFilePath) return;
+		if (currentView.editor !== editor) return;
 
 		const lineIndex = lineNumber - 1;
 		if (lineIndex < 0 || lineIndex >= editor.lineCount()) return;
@@ -139,7 +198,7 @@ export default class LinkForgePlugin extends Plugin {
 			const basename = createdFile.basename;
 
 			// Verify the basename alone resolves uniquely to our file
-			const resolved = this.app.metadataCache.getFirstLinkpathDest(basename, activeFilePath);
+			const resolved = this.app.metadataCache.getFirstLinkpathDest(basename, sourceFilePath);
 			if (!resolved || resolved.path !== createdFile.path) continue;
 
 			const shortened = buildShortenedLink(original, basename, heading, alias);
