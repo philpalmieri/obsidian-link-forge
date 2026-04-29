@@ -1,4 +1,4 @@
-import { Plugin, TFile, TAbstractFile, MarkdownView } from 'obsidian';
+import { Plugin, TFile, TAbstractFile, MarkdownView, Notice } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { DEFAULT_SETTINGS, LinkForgeSettings, LinkForgeSettingTab } from './settings';
 import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings } from './utils';
@@ -6,6 +6,7 @@ import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShort
 export default class LinkForgePlugin extends Plugin {
 	settings: LinkForgeSettings;
 	private processing = false;
+	private templaterNoticeShown = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -87,7 +88,16 @@ export default class LinkForgePlugin extends Plugin {
 			console.debug(`[Link Forge] Created: ${filePath}`);
 
 			if (this.settings.applyTemplaterTemplates) {
-				await this.triggerTemplater(newFile);
+				if (this.isTemplaterAvailable()) {
+					await this.triggerTemplater(newFile);
+				} else if (!this.templaterNoticeShown) {
+					this.templaterNoticeShown = true;
+					new Notice(
+						// eslint-disable-next-line obsidianmd/ui/sentence-case
+						'Link Forge: Templater integration is enabled but Templater is not installed or active. Files will be created without templates.',
+						8000
+					);
+				}
 			}
 		} catch {
 			// File may already exist (race condition or concurrent creation)
@@ -159,6 +169,16 @@ export default class LinkForgePlugin extends Plugin {
 				editor.setLine(lineIndex, newLineText);
 			}
 		}
+	}
+
+	/**
+	 * Check if the Templater plugin is installed and enabled.
+	 */
+	isTemplaterAvailable(): boolean {
+		/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+		const templater = (this.app as any).plugins?.plugins?.['templater-obsidian'];
+		return !!templater?.templater;
+		/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 	}
 
 	/**
