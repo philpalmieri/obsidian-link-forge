@@ -2,11 +2,17 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import LinkForgePlugin from './main';
 
 export interface LinkForgeSettings {
-	autoCreateEnabled: boolean;
+	enabled: boolean;
+	watchedFolders: string[];
+	applyTemplaterTemplates: boolean;
+	shortenLinksAfterCreation: boolean;
 }
 
 export const DEFAULT_SETTINGS: LinkForgeSettings = {
-	autoCreateEnabled: true,
+	enabled: true,
+	watchedFolders: ['People/', 'Projects/'],
+	applyTemplaterTemplates: true,
+	shortenLinksAfterCreation: true,
 };
 
 export class LinkForgeSettingTab extends PluginSettingTab {
@@ -23,12 +29,46 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Auto-create linked files')
-			.setDesc('Automatically create a new note when a wikilink target does not exist.')
+			.setName('Enabled')
+			.setDesc('Global toggle for auto-creating linked files.')
 			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoCreateEnabled)
+				.setValue(this.plugin.settings.enabled)
 				.onChange(async (value) => {
-					this.plugin.settings.autoCreateEnabled = value;
+					this.plugin.settings.enabled = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Watched folders')
+			.setDesc('Only auto-create files for links targeting these folders (comma-separated, e.g. "People/, Projects/").')
+			.addText(text => text
+				.setPlaceholder('People/, Projects/')
+				.setValue(this.plugin.settings.watchedFolders.join(', '))
+				.onChange(async (value) => {
+					this.plugin.settings.watchedFolders = value
+						.split(',')
+						.map(s => s.trim())
+						.filter(s => s.length > 0);
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Apply Templater templates')
+			.setDesc('Trigger Templater folder templates on newly created files (requires Templater plugin).')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.applyTemplaterTemplates)
+				.onChange(async (value) => {
+					this.plugin.settings.applyTemplaterTemplates = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Shorten links after creation')
+			.setDesc('Rewrite full-path wikilinks to shortest unique name after the file is created (e.g. [[People/Name]] → [[Name]]).')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.shortenLinksAfterCreation)
+				.onChange(async (value) => {
+					this.plugin.settings.shortenLinksAfterCreation = value;
 					await this.plugin.saveSettings();
 				}));
 	}
