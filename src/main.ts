@@ -1,7 +1,7 @@
 import { Plugin, TFile, TAbstractFile, MarkdownView, Editor, normalizePath } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { DEFAULT_SETTINGS, LinkForgeSettings, LinkForgeSettingTab } from './settings';
-import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings, ParsedWikilink } from './utils';
+import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings, hasNonMarkdownExtension, ParsedWikilink } from './utils';
 
 interface ProcessingContext {
 	lineText: string;
@@ -93,7 +93,7 @@ export default class LinkForgePlugin extends Plugin {
 			if (!isInWatchedFolder(link.linkPath, this.settings.watchedFolders)) continue;
 
 			// Skip links that target non-markdown extensions
-			if (this.hasNonMarkdownExtension(link.linkPath)) continue;
+			if (hasNonMarkdownExtension(link.linkPath)) continue;
 
 			const resolvedFile = this.app.metadataCache.getFirstLinkpathDest(
 				link.linkPath,
@@ -111,16 +111,6 @@ export default class LinkForgePlugin extends Plugin {
 		if (this.settings.shortenLinksAfterCreation && createdLinks.length > 0) {
 			this.shortenLinks(createdLinks, lineNumber, sourceFilePath, editor);
 		}
-	}
-
-	/**
-	 * Check if a link path has a non-markdown file extension.
-	 */
-	private hasNonMarkdownExtension(linkPath: string): boolean {
-		const lastDot = linkPath.lastIndexOf('.');
-		if (lastDot === -1) return false;
-		const ext = linkPath.substring(lastDot + 1).toLowerCase();
-		return ext !== 'md' && ext.length > 0 && ext.length <= 5;
 	}
 
 	/**

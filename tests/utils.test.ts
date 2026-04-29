@@ -4,6 +4,7 @@ import {
 	isInWatchedFolder,
 	buildShortenedLink,
 	applyLinkShortenings,
+	hasNonMarkdownExtension,
 } from '../src/utils';
 
 describe('extractWikilinks', () => {
@@ -182,5 +183,72 @@ describe('applyLinkShortenings', () => {
 		);
 		// String.replace only replaces first occurrence
 		expect(result).toBe('[[Name]] and [[People/Name]]');
+	});
+
+	it('leaves text intact when replacement target is not found', () => {
+		const text = 'See [[People/Alice]] today';
+		const result = applyLinkShortenings(
+			text,
+			[{ original: '[[People/Bob]]', shortened: '[[Bob]]' }]
+		);
+		expect(result).toBe(text);
+	});
+});
+
+describe('hasNonMarkdownExtension', () => {
+	it('returns false for paths with no extension', () => {
+		expect(hasNonMarkdownExtension('People/John Doe')).toBe(false);
+		expect(hasNonMarkdownExtension('Projects/Alpha')).toBe(false);
+		expect(hasNonMarkdownExtension('Simple Note')).toBe(false);
+	});
+
+	it('returns false for .md extension', () => {
+		expect(hasNonMarkdownExtension('People/John.md')).toBe(false);
+		expect(hasNonMarkdownExtension('note.md')).toBe(false);
+	});
+
+	it('returns false for .MD extension (case insensitive)', () => {
+		expect(hasNonMarkdownExtension('File.MD')).toBe(false);
+		expect(hasNonMarkdownExtension('File.Md')).toBe(false);
+	});
+
+	it('returns true for common non-markdown extensions', () => {
+		expect(hasNonMarkdownExtension('image.png')).toBe(true);
+		expect(hasNonMarkdownExtension('doc.pdf')).toBe(true);
+		expect(hasNonMarkdownExtension('photo.jpg')).toBe(true);
+		expect(hasNonMarkdownExtension('data.csv')).toBe(true);
+		expect(hasNonMarkdownExtension('archive.zip')).toBe(true);
+	});
+
+	it('returns true for extensions in paths with folders', () => {
+		expect(hasNonMarkdownExtension('Attachments/file.pdf')).toBe(true);
+		expect(hasNonMarkdownExtension('Assets/Images/photo.png')).toBe(true);
+	});
+
+	it('returns false for trailing dot (empty extension)', () => {
+		expect(hasNonMarkdownExtension('file.')).toBe(false);
+	});
+
+	it('returns false for extensions longer than 5 characters', () => {
+		// Avoids false positives from dots in names like "Dr. Smith"
+		expect(hasNonMarkdownExtension('People/Dr. Smith')).toBe(false);
+		expect(hasNonMarkdownExtension('Notes/Rev. Johnson')).toBe(false);
+	});
+
+	it('uses the last dot for multi-dot paths', () => {
+		// "file.name.pdf" → ext is "pdf"
+		expect(hasNonMarkdownExtension('file.name.pdf')).toBe(true);
+		// "file.backup.md" → ext is "md"
+		expect(hasNonMarkdownExtension('file.backup.md')).toBe(false);
+	});
+
+	it('handles short valid extensions at the boundary', () => {
+		// 1-5 char extensions should be detected
+		expect(hasNonMarkdownExtension('file.a')).toBe(true);    // 1 char
+		expect(hasNonMarkdownExtension('file.js')).toBe(true);   // 2 chars
+		expect(hasNonMarkdownExtension('file.tsx')).toBe(true);  // 3 chars
+		expect(hasNonMarkdownExtension('file.json')).toBe(true); // 4 chars
+		expect(hasNonMarkdownExtension('file.xhtml')).toBe(true); // 5 chars
+		expect(hasNonMarkdownExtension('file.svelte')).toBe(false); // 6 chars - too long
 	});
 });
