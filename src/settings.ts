@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import LinkForgePlugin from './main';
 
 export interface LinkForgeSettings {
@@ -45,7 +45,7 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.watchedFolders = value
 						.split(',')
-						.map(s => s.trim())
+						.map(s => normalizePath(s.trim()))
 						.filter(s => s.length > 0);
 					await this.plugin.saveSettings();
 				}));
