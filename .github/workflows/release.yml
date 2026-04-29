@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '[0-9]*.[0-9]*.[0-9]*'
 
 permissions:
   contents: write
@@ -21,11 +21,9 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - run: npm ci --legacy-peer-deps
-
       - name: Validate version consistency
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${GITHUB_REF_NAME}"
           PKG_VERSION=$(node -p "require('./package.json').version")
           MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
 
@@ -33,10 +31,17 @@ jobs:
           echo "package.json: $PKG_VERSION"
           echo "manifest.json: $MANIFEST_VERSION"
 
+          if ! [[ "$TAG_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Tag ($TAG_VERSION) is not a valid strict SemVer MAJOR.MINOR.PATCH format"
+            exit 1
+          fi
+
           if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
             echo "::error::Version mismatch! Tag ($TAG_VERSION) must match package.json ($PKG_VERSION) and manifest.json ($MANIFEST_VERSION)"
             exit 1
           fi
+
+      - run: npm ci --legacy-peer-deps
 
       - name: Lint
         run: npm run lint
@@ -61,6 +66,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
+          name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             main.js
