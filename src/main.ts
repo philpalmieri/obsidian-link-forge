@@ -1,6 +1,7 @@
 import { Plugin, TFile, TAbstractFile, MarkdownView } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { DEFAULT_SETTINGS, LinkForgeSettings, LinkForgeSettingTab } from './settings';
+import { extractWikilinks, isInWatchedFolder, buildShortenedLink, applyLinkShortenings } from './utils';
 
 export default class LinkForgePlugin extends Plugin {
 	settings: LinkForgeSettings;
@@ -42,49 +43,30 @@ export default class LinkForgePlugin extends Plugin {
 		this.processing = true;
 
 		try {
-			const wikiLinkRegex = /\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]/g;
-			let match: RegExpExecArray | null;
-			const createdLinks: { original: string; linkPath: string }[] = [];
+			const links = extractWikilinks(lineText);
+			const createdLinks: { original: string; linkPath: string; heading: string | undefined; alias: string | undefined }[] = [];
 
-			while ((match = wikiLinkRegex.exec(lineText)) !== null) {
-				const linkPath = match[1]?.trim();
-				if (!linkPath) continue;
+			for (const link of links) {
+				if (!isInWatchedFolder(link.linkPath, this.settings.watchedFolders)) continue;
 
-				// Check if link targets a watched folder
-				if (!this.isInWatchedFolder(linkPath)) continue;
-
-				// Check if file already exists
 				const activeFile = this.app.workspace.getActiveFile();
 				const resolvedFile = this.app.metadataCache.getFirstLinkpathDest(
-					linkPath,
+					link.linkPath,
 					activeFile?.path ?? ''
 				);
 
 				if (!resolvedFile) {
-					await this.createFileFromLink(linkPath);
-					createdLinks.push({ original: match[0], linkPath });
+					await this.createFileFromLink(link.linkPath);
+					createdLinks.push(link);
 				}
 			}
 
-			// Shorten links in the editor after creation
 			if (this.settings.shortenLinksAfterCreation && createdLinks.length > 0) {
 				await this.shortenLinks(createdLinks, lineNumber);
 			}
 		} finally {
 			this.processing = false;
 		}
-	}
-
-	/**
-	 * Check if a link path targets one of the configured watched folders.
-	 */
-	private isInWatchedFolder(linkPath: string): boolean {
-		if (this.settings.watchedFolders.length === 0) return true;
-
-		return this.settings.watchedFolders.some(folder => {
-			const normalized = folder.endsWith('/') ? folder : folder + '/';
-			return linkPath.startsWith(normalized);
-		});
 	}
 
 	/**
@@ -134,11 +116,11 @@ export default class LinkForgePlugin extends Plugin {
 
 	/**
 	 * Shorten wikilinks in the editor after file creation.
-	 * Rewrites [[People/Johnny Appleseed]] → [[Johnny Appleseed]] if the
+	 * Rewrites [[People/Johnny Appleseed]] to [[Johnny Appleseed]] if the
 	 * basename resolves uniquely to the created file.
 	 */
 	private async shortenLinks(
-		createdLinks: { original: string; linkPath: string }[],
+		createdLinks: { original: string; linkPath: string; heading: string | undefined; alias: string | undefined }[],
 		lineNumber: number
 	): Promise<void> {
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -147,37 +129,34 @@ export default class LinkForgePlugin extends Plugin {
 		const editor = view.editor;
 		const activeFilePath = view.file?.path ?? '';
 
-		// Re-read the line from the editor (it may have shifted, but lineNumber is stable here)
-		const lineIndex = lineNumber - 1; // editor uses 0-based
+		const lineIndex = lineNumber - 1;
 		if (lineIndex < 0 || lineIndex >= editor.lineCount()) return;
 		let currentLineText = editor.getLine(lineIndex);
 
-		for (const { original, linkPath } of createdLinks) {
+		const replacements: { original: string; shortened: string }[] = [];
+
+		for (const { original, linkPath, heading, alias } of createdLinks) {
 			const filePath = linkPath.endsWith('.md') ? linkPath : linkPath + '.md';
 			const createdFile = this.app.vault.getAbstractFileByPath(filePath);
 			if (!createdFile || !(createdFile instanceof TFile)) continue;
 
-			// Get the shortest link path that resolves to this file
 			const basename = createdFile.basename;
 
-			// Verify the basename alone resolves to our file (no ambiguity)
+			// Verify the basename alone resolves uniquely to our file
 			const resolved = this.app.metadataCache.getFirstLinkpathDest(basename, activeFilePath);
 			if (!resolved || resolved.path !== createdFile.path) continue;
 
-			// Build the shortened wikilink, preserving any alias
-			const aliasMatch = original.match(/\[\[[^\]|#]+?(?:#[^\]|]*)?\|([^\]]+)\]\]/);
-			const shortened = aliasMatch
-				? `[[${basename}|${aliasMatch[1]}]]`
-				: `[[${basename}]]`;
+			const shortened = buildShortenedLink(original, basename, heading, alias);
+			if (shortened) {
+				replacements.push({ original, shortened });
+				console.log(`[Link Forge] Shortened: ${original} → ${shortened}`);
+			}
+		}
 
-			if (original === shortened) continue;
-
-			// Replace in the line text
-			const newLineText = currentLineText.replace(original, shortened);
+		if (replacements.length > 0) {
+			const newLineText = applyLinkShortenings(currentLineText, replacements);
 			if (newLineText !== currentLineText) {
 				editor.setLine(lineIndex, newLineText);
-				currentLineText = newLineText;
-				console.log(`[Link Forge] Shortened: ${original} → ${shortened}`);
 			}
 		}
 	}
