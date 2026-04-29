@@ -42,6 +42,7 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 			.setName('Watched folders')
 			.setDesc('Only auto-create files for links targeting these folders (comma-separated, e.g. "People/, Projects/").')
 			.addText(text => text
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				.setPlaceholder('People/, Projects/')
 				.setValue(this.plugin.settings.watchedFolders.join(', '))
 				.onChange(async (value) => {
@@ -53,7 +54,9 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setName('Apply Templater templates')
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc('Trigger Templater folder templates on newly created files (requires Templater plugin).')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.applyTemplaterTemplates)

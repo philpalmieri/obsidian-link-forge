@@ -84,7 +84,7 @@ export default class LinkForgePlugin extends Plugin {
 
 		try {
 			const newFile = await this.app.vault.create(filePath, '');
-			console.log(`[Link Forge] Created: ${filePath}`);
+			console.debug(`[Link Forge] Created: ${filePath}`);
 
 			if (this.settings.applyTemplaterTemplates) {
 				await this.triggerTemplater(newFile);
@@ -149,7 +149,7 @@ export default class LinkForgePlugin extends Plugin {
 			const shortened = buildShortenedLink(original, basename, heading, alias);
 			if (shortened) {
 				replacements.push({ original, shortened });
-				console.log(`[Link Forge] Shortened: ${original} → ${shortened}`);
+				console.debug(`[Link Forge] Shortened: ${original} → ${shortened}`);
 			}
 		}
 
@@ -166,11 +166,11 @@ export default class LinkForgePlugin extends Plugin {
 	 */
 	private async triggerTemplater(file: TFile): Promise<void> {
 		try {
+			/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const templater = (this.app as any).plugins?.plugins?.['templater-obsidian'];
 			if (!templater?.templater) return;
 
-			// Templater exposes create_running_config and write_template_to_file
 			const runningConfig = templater.templater.create_running_config(
 				undefined, // template file (undefined = use folder template)
 				file,
@@ -180,8 +180,9 @@ export default class LinkForgePlugin extends Plugin {
 			if (runningConfig) {
 				await templater.templater.read_and_parse_template(runningConfig);
 			}
+			/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 		} catch (e) {
-			console.log('[Link Forge] Templater integration skipped:', e);
+			console.debug('[Link Forge] Templater integration skipped:', e);
 		}
 	}
 
