@@ -33,6 +33,11 @@ jobs:
           echo "package.json: $PKG_VERSION"
           echo "manifest.json: $MANIFEST_VERSION"
 
+          if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag ($TAG_VERSION) is not a valid strict SemVer MAJOR.MINOR.PATCH format"
+            exit 1
+          fi
+
           if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
             echo "::error::Version mismatch! Tag ($TAG_VERSION) must match package.json ($PKG_VERSION) and manifest.json ($MANIFEST_VERSION)"
             exit 1
