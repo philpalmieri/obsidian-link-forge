@@ -4,14 +4,12 @@ import LinkForgePlugin from './main';
 export interface LinkForgeSettings {
 	enabled: boolean;
 	watchedFolders: string[];
-	applyTemplaterTemplates: boolean;
 	shortenLinksAfterCreation: boolean;
 }
 
 export const DEFAULT_SETTINGS: LinkForgeSettings = {
 	enabled: true,
 	watchedFolders: [],
-	applyTemplaterTemplates: false,
 	shortenLinksAfterCreation: true,
 };
 
@@ -57,34 +55,6 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 			text: 'Tip: use folder prefixes like "People/, Projects/, Areas/" to limit auto-creation to specific parts of your vault.',
 			cls: 'setting-item-description',
 		});
-
-		// Templater section
-		const templaterAvailable = this.plugin.isTemplaterAvailable();
-
-		const templaterSetting = new Setting(containerEl)
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setName('Apply Templater templates');
-
-		if (templaterAvailable) {
-			templaterSetting
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				.setDesc('Trigger Templater folder templates on newly created files.')
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.applyTemplaterTemplates)
-					.onChange(async (value) => {
-						this.plugin.settings.applyTemplaterTemplates = value;
-						await this.plugin.saveSettings();
-					}));
-		} else {
-			templaterSetting
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				.setDesc('Requires the Templater plugin to be installed and active. Install Templater from Community Plugins to enable this feature.')
-				.addToggle(toggle => toggle
-					.setValue(false)
-					.setDisabled(true));
-			// eslint-disable-next-line obsidianmd/no-static-styles-assignment
-			templaterSetting.descEl.style.color = 'var(--text-muted)';
-		}
 
 		new Setting(containerEl)
 			.setName('Shorten links after creation')
