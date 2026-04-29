@@ -109,7 +109,7 @@ Reload Obsidian with `Cmd+R`. Open the dev console with `Cmd+Option+I` to see `[
 
 1. Bump version in `manifest.json` and `package.json`
 2. Update `versions.json` with the new version → minimum Obsidian version mapping
-3. Commit and tag: `git tag v1.0.0`
+3. Commit and tag: `git tag 1.0.1`
 4. Push: `git push origin main --tags`
 5. CI validates, builds, attests, and creates the GitHub Release automatically
 
