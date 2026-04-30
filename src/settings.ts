@@ -51,8 +51,7 @@ export class LinkForgeSettingTab extends PluginSettingTab {
 				}));
 		watchedFoldersSetting.descEl.createEl('br');
 		watchedFoldersSetting.descEl.createEl('small', {
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			text: 'Tip: use folder prefixes like "People/, Projects/, Areas/" to limit auto-creation to specific parts of your vault.',
+			text: 'Use folder prefixes to limit auto-creation to specific parts of your vault.',
 			cls: 'setting-item-description',
 		});
 
