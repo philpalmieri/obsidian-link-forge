@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-link-forge",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Auto-creates linked files when they don't exist, in real-time.",
 	"main": "main.js",
 	"type": "module",
